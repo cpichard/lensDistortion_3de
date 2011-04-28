@@ -215,7 +215,7 @@ class StaticInfo{
 
 
 
-LensDistortion_3de::LensDistortion_3de(Node * n,int num) : Iop(n) , _node_name(models.names[num]) , k_direction(0), recenter(false),offsetx(0), offsety(0)
+LensDistortion_3de::LensDistortion_3de(Node * n,int num) : Iop(n) , _node_name(models.names[num]) , k_direction(0), recenter(true),offsetx(0), offsety(0)
 {
   //
   // work out how many parallel plugins we need (we need one per thread, since they aren't threadsafe)
@@ -364,8 +364,8 @@ Box LensDistortion_3de::bounds(bool direction,const Box & input, double width,do
   //top and bottom
 
   // Offset to recenter the image
-  const double loffsetx = direction ? offsetx : offsetx;
-  const double loffsety = direction ? offsety : offsety;
+  const double loffsetx = direction ? offsetx : -offsetx;
+  const double loffsety = direction ? offsety : -offsety;
 
   Box out;
   
@@ -462,16 +462,32 @@ void LensDistortion_3de::_validate(bool for_real)
       if(recenter == true)
       {
           if( strcmp(j->first.name_ldpk.c_str(),"tde4_filmback_width_cm")==0 )
+          {
                fbw = j->second;
-
+          }
           if( strcmp(j->first.name_ldpk.c_str(),"tde4_filmback_height_cm")==0 )
+          {
                fbh = j->second;
+          }
 
           if(strcmp(j->first.name_ldpk.c_str(),"tde4_lens_center_offset_x_cm")==0 )
+          {
                 lox = j->second;
-
-          if(strcmp(j->first.name_ldpk.c_str(),"tde4_lens_center_offset_x_cm")==0 )
-                loy = j->second;
+                // If we are in the "recenter" mode, and we want to distord an already recentered image
+                // the center of the distorsion is a 0.0, 0.0
+                if( recenter && (1-k_direction) )
+                {
+                    pl[i].get_model()->setParameterValue(j->first.name_ldpk.c_str(),0.0);
+                }
+          }
+          if(strcmp(j->first.name_ldpk.c_str(),"tde4_lens_center_offset_y_cm")==0 )
+          {
+            loy = j->second;
+            if( recenter && (1-k_direction) )
+            {
+                pl[i].get_model()->setParameterValue(j->first.name_ldpk.c_str(),0.0);
+            }
+          }
       }
     } 
     pl[i].get_model()->initializeParameters();
@@ -483,15 +499,14 @@ void LensDistortion_3de::_validate(bool for_real)
         offsetx = lox/fbw;
 
       if(fbh!=0)
-        offsety = loy/fbw;
+        offsety = loy/fbh;
   }
   filter.initialize();
-  
+
   //
   // set the output bounding box according to the bounds
   // since this is downwards not upwards, we have to flip the direction
   //
-  
   Box box = bounds(1-k_direction,info_,format().width(),format().height());
   info_.set(box);
 }
@@ -525,8 +540,8 @@ void LensDistortion_3de::engine(int y,int x,int r,ChannelMask channels,Row & out
   const double loffsetx = k_direction ? offsetx : -offsetx;
   const double loffsety = k_direction ? offsety : -offsety;
 
-  // Added 0.5 when recentering to match perfectly the image rendered by 3de.
-  double y_s = recenter ? (y+0.5)/h + loffsety : (y+0.0)/h ;
+  double y_s = loffsety +(y+0.0)/h ;
+
 //  double y_s = (y+0.5)/h;
 
   ///
@@ -569,7 +584,7 @@ void LensDistortion_3de::engine(int y,int x,int r,ChannelMask channels,Row & out
     // distort each pixel on row - store result in array, and track bounding box
     for(int i = x;i<r;i++)
     {
-      double i_s=loffsetx+(i+0.0)/w;
+      double i_s= loffsetx+(i+0.0)/w;
 
       double x_o,y_o;
       if(k_direction)
