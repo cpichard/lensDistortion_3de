@@ -215,7 +215,7 @@ class StaticInfo{
 
 
 
-LensDistortion_3de::LensDistortion_3de(Node * n,int num) : Iop(n) , _node_name(models.names[num]) , k_direction(0), recenter(true),offsetx(0), offsety(0)
+LensDistortion_3de::LensDistortion_3de(Node * n,int num) : Iop(n) , _node_name(models.names[num]) , k_direction(0), recenter(false),offsetx(0), offsety(0)
 {
   //
   // work out how many parallel plugins we need (we need one per thread, since they aren't threadsafe)
